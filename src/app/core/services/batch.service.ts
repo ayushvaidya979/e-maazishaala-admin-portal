@@ -375,6 +375,7 @@ export class BatchService implements OnDestroy {
       standard,
       subject,
       description: batch.description || '',
+      cover_image_url: batch.cover_image_url || '',
       start_date: batch.start_date || new Date().toISOString().split('T')[0],
       end_date: batch.end_date || new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
       registration_start: batch.registration_start || new Date().toISOString().split('T')[0],
@@ -403,6 +404,7 @@ export class BatchService implements OnDestroy {
         name: newBatch.name,
         course_name: newBatch.course_name,
         description: newBatch.description,
+        cover_image_url: newBatch.cover_image_url || null,
         start_date: newBatch.start_date,
         end_date: newBatch.end_date,
         price: newBatch.price,
@@ -480,6 +482,36 @@ export class BatchService implements OnDestroy {
     const batch = this.batchesSignal().find(b => b.id === id);
     if (!batch) return false;
     return (await this.updateBatch(id, { is_featured: !batch.is_featured })).success;
+  }
+
+  async uploadCoverImage(file: File): Promise<{ url?: string; error?: string }> {
+    try {
+      const fileExt = file.name.split('.').pop() || 'jpg';
+      const fileName = `batch_cover_${Date.now()}_${Math.random().toString(36).substring(2, 7)}.${fileExt}`;
+      const filePath = `batch-covers/${fileName}`;
+
+      const { error: uploadError } = await this.supabase.storage
+        .from('batch-covers')
+        .upload(filePath, file, { upsert: true });
+
+      if (uploadError) {
+        // Fallback: encode as data URL so the preview still works
+        return new Promise((resolve) => {
+          const reader = new FileReader();
+          reader.onload = (e: any) => resolve({ url: e.target.result });
+          reader.onerror = () => resolve({ error: uploadError.message });
+          reader.readAsDataURL(file);
+        });
+      }
+
+      const { data: publicUrlData } = this.supabase.storage
+        .from('batch-covers')
+        .getPublicUrl(filePath);
+
+      return { url: publicUrlData.publicUrl };
+    } catch (err: any) {
+      return { error: err.message || 'Image upload failed' };
+    }
   }
 
   async deleteBatch(id: string): Promise<boolean> {

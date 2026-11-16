@@ -14,6 +14,7 @@ export interface Batch {
   standard?: number;
   subject?: string;
   description?: string;
+  cover_image_url?: string;
   start_date: string;
   end_date: string;
   registration_start: string;

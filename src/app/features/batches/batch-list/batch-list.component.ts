@@ -468,6 +468,41 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
                   class="w-full p-3 rounded-xl border border-slate-200 text-xs focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700 focus:outline-none transition"></textarea>
               </div>
 
+              <!-- Cover Image Upload -->
+              <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200 space-y-2">
+                <label class="block text-xs font-semibold text-slate-700">Batch Cover Image</label>
+                <div class="flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  @if (formData.cover_image_url) {
+                    <img
+                      [src]="formData.cover_image_url"
+                      alt="Batch cover preview"
+                      class="w-14 h-14 object-cover rounded-md border border-slate-300 shadow-2xs shrink-0 bg-white" />
+                  } @else {
+                    <div class="w-14 h-14 rounded-md border border-slate-200 bg-slate-100 flex items-center justify-center shrink-0">
+                      <app-icon name="image" [size]="20" color="#94a3b8"></app-icon>
+                    </div>
+                  }
+                  <div class="flex-1 w-full space-y-1.5">
+                    <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs transition">
+                      <app-icon name="upload" [size]="14"></app-icon>
+                      <span>{{ isBatchUploading() ? 'Uploading...' : 'Upload & Crop Cover Image' }}</span>
+                      <input
+                        type="file"
+                        accept="image/*"
+                        (change)="onBatchFileSelected($event)"
+                        class="hidden" />
+                    </label>
+                    <div class="text-[10px] text-slate-400">Or paste an existing image URL below:</div>
+                    <input
+                      type="url"
+                      [(ngModel)]="formData.cover_image_url"
+                      name="cover_image_url"
+                      placeholder="https://..."
+                      class="w-full h-8 px-3 rounded-lg border border-slate-200 text-xs bg-white focus:outline-none focus:ring-1 focus:ring-emerald-700" />
+                  </div>
+                </div>
+              </div>
+
               <!-- Actions -->
               <div class="pt-4 border-t border-slate-100 flex items-center justify-between">
                 <button
@@ -488,6 +523,58 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      }
+
+      <!-- Batch Image Crop Modal -->
+      @if (showBatchCropModal()) {
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-slide-in">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Crop Batch Cover Image</h3>
+                <p class="text-[11px] text-slate-500">Drag to reposition · Scroll to zoom</p>
+              </div>
+              <button type="button" (click)="cancelBatchCrop()" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition">
+                <app-icon name="x" [size]="16"></app-icon>
+              </button>
+            </div>
+
+            <div class="relative bg-slate-900 flex items-center justify-center overflow-hidden select-none" style="height:300px"
+              (mousedown)="batchCropDragStart($event)"
+              (mousemove)="batchCropDragMove($event)"
+              (mouseup)="batchCropDragEnd()"
+              (mouseleave)="batchCropDragEnd()"
+              (wheel)="batchCropWheel($event)">
+              <canvas id="batchCropCanvas"
+                [style.left.px]="batchCropOffsetX"
+                [style.top.px]="batchCropOffsetY"
+                [style.width.px]="batchCropCanvasDisplayW * batchCropScale"
+                [style.height.px]="batchCropCanvasDisplayH * batchCropScale"
+                [style.cursor]="batchCropDragging ? 'grabbing' : 'grab'"
+                style="position:absolute; transform-origin: top left;">
+              </canvas>
+              <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div class="border-2 border-white/90 rounded-md" style="width:200px;height:150px;box-shadow:0 0 0 9999px rgba(0,0,0,0.55)"></div>
+              </div>
+            </div>
+
+            <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2 text-slate-500">
+                <button type="button" (click)="batchCropZoom(-0.1)" class="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 font-bold text-base leading-none flex items-center justify-center">−</button>
+                <span class="text-xs font-mono">{{ (batchCropScale * 100).toFixed(0) }}%</span>
+                <button type="button" (click)="batchCropZoom(0.1)" class="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 font-bold text-base leading-none flex items-center justify-center">+</button>
+                <button type="button" (click)="batchCropReset()" class="h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-xs text-slate-600">Reset</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" (click)="cancelBatchCrop()" class="h-8 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                <button type="button" (click)="applyBatchCrop()" class="h-8 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                  <app-icon name="check" [size]="13"></app-icon>
+                  Apply & Upload
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       }
@@ -544,6 +631,7 @@ export class BatchListComponent implements OnInit {
     name: '',
     course_name: '',
     description: '',
+    cover_image_url: '',
     start_date: new Date().toISOString().split('T')[0],
     end_date: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
     registration_start: new Date().toISOString().split('T')[0],
@@ -605,6 +693,7 @@ export class BatchListComponent implements OnInit {
       standard: 10,
       subject: 'Mathematics',
       description: '',
+      cover_image_url: '',
       start_date: new Date().toISOString().split('T')[0],
       end_date: new Date(Date.now() + 90 * 86400000).toISOString().split('T')[0],
       registration_start: new Date().toISOString().split('T')[0],
@@ -671,6 +760,132 @@ export class BatchListComponent implements OnInit {
 
     await this.batchService.deleteBatch(batch.id);
     this.batchToDelete.set(null);
+  }
+
+  // ─── Batch Image Upload & Crop Logic ──────────────────────────────────────
+  isBatchUploading = signal(false);
+  showBatchCropModal = signal(false);
+  batchCropScale = 1;
+  batchCropOffsetX = 0;
+  batchCropOffsetY = 0;
+  batchCropCanvasDisplayW = 0;
+  batchCropCanvasDisplayH = 0;
+  batchCropDragging = false;
+  private batchCropDragStartX = 0;
+  private batchCropDragStartY = 0;
+  private batchCropDragStartOffX = 0;
+  private batchCropDragStartOffY = 0;
+  private batchCropOriginalFile: File | null = null;
+  private batchCropImage: HTMLImageElement | null = null;
+  private readonly BATCH_CROP_W = 200;
+  private readonly BATCH_CROP_H = 150;
+  private readonly BATCH_PREVIEW_W = 480;
+  private readonly BATCH_PREVIEW_H = 300;
+
+  async onBatchFileSelected(event: any) {
+    const file: File = event.target.files?.[0];
+    if (!file) return;
+    this.batchCropOriginalFile = file;
+    (event.target as HTMLInputElement).value = '';
+
+    const img = new Image();
+    img.onload = () => {
+      this.batchCropImage = img;
+      this.batchCropScale = 1;
+      this.batchCropCanvasDisplayW = img.naturalWidth;
+      this.batchCropCanvasDisplayH = img.naturalHeight;
+      this.batchCropOffsetX = (this.BATCH_PREVIEW_W - img.naturalWidth) / 2;
+      this.batchCropOffsetY = (this.BATCH_PREVIEW_H - img.naturalHeight) / 2;
+      this.showBatchCropModal.set(true);
+      setTimeout(() => this.drawBatchCropCanvas(), 50);
+    };
+    img.src = URL.createObjectURL(file);
+  }
+
+  private drawBatchCropCanvas() {
+    const canvas = document.getElementById('batchCropCanvas') as HTMLCanvasElement | null;
+    if (!canvas || !this.batchCropImage) return;
+    canvas.width = this.batchCropImage.naturalWidth;
+    canvas.height = this.batchCropImage.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(this.batchCropImage, 0, 0);
+  }
+
+  batchCropDragStart(e: MouseEvent) {
+    this.batchCropDragging = true;
+    this.batchCropDragStartX = e.clientX;
+    this.batchCropDragStartY = e.clientY;
+    this.batchCropDragStartOffX = this.batchCropOffsetX;
+    this.batchCropDragStartOffY = this.batchCropOffsetY;
+  }
+
+  batchCropDragMove(e: MouseEvent) {
+    if (!this.batchCropDragging) return;
+    this.batchCropOffsetX = this.batchCropDragStartOffX + (e.clientX - this.batchCropDragStartX);
+    this.batchCropOffsetY = this.batchCropDragStartOffY + (e.clientY - this.batchCropDragStartY);
+  }
+
+  batchCropDragEnd() { this.batchCropDragging = false; }
+
+  batchCropWheel(e: WheelEvent) {
+    e.preventDefault();
+    this.batchCropZoom(e.deltaY < 0 ? 0.08 : -0.08);
+  }
+
+  batchCropZoom(delta: number) {
+    this.batchCropScale = Math.min(5, Math.max(0.2, this.batchCropScale + delta));
+  }
+
+  batchCropReset() {
+    this.batchCropScale = 1;
+    if (this.batchCropImage) {
+      this.batchCropOffsetX = (this.BATCH_PREVIEW_W - this.batchCropImage.naturalWidth) / 2;
+      this.batchCropOffsetY = (this.BATCH_PREVIEW_H - this.batchCropImage.naturalHeight) / 2;
+    }
+  }
+
+  cancelBatchCrop() {
+    this.showBatchCropModal.set(false);
+    this.batchCropImage = null;
+    this.batchCropOriginalFile = null;
+  }
+
+  async applyBatchCrop() {
+    if (!this.batchCropImage) return;
+
+    const containerCentreX = this.BATCH_PREVIEW_W / 2;
+    const containerCentreY = this.BATCH_PREVIEW_H / 2;
+
+    const frameLeft = containerCentreX - this.BATCH_CROP_W / 2;
+    const frameTop = containerCentreY - this.BATCH_CROP_H / 2;
+
+    const sx = (frameLeft - this.batchCropOffsetX) / this.batchCropScale;
+    const sy = (frameTop - this.batchCropOffsetY) / this.batchCropScale;
+    const sw = this.BATCH_CROP_W / this.batchCropScale;
+    const sh = this.BATCH_CROP_H / this.batchCropScale;
+
+    const out = document.createElement('canvas');
+    out.width = 800;
+    out.height = Math.round(800 * (this.BATCH_CROP_H / this.BATCH_CROP_W));
+    const ctx = out.getContext('2d')!;
+    ctx.drawImage(this.batchCropImage, sx, sy, sw, sh, 0, 0, out.width, out.height);
+
+    out.toBlob(async (blob) => {
+      if (!blob) { this.toast.error('Crop failed'); return; }
+      const croppedFile = new File([blob], this.batchCropOriginalFile?.name || 'batch-cover.jpg', { type: 'image/jpeg' });
+      this.showBatchCropModal.set(false);
+      this.isBatchUploading.set(true);
+      const { url, error } = await this.batchService.uploadCoverImage(croppedFile);
+      this.isBatchUploading.set(false);
+      if (url) {
+        this.formData.cover_image_url = url;
+        this.toast.success('Batch cover cropped & uploaded!');
+      } else if (error) {
+        this.toast.warning(error);
+      }
+    }, 'image/jpeg', 0.92);
   }
 }
 

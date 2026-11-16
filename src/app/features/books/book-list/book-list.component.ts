@@ -1,4 +1,4 @@
-import { Component, OnInit, inject, signal, computed } from '@angular/core';
+import { Component, OnInit, inject, signal, computed, ViewChild, ElementRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router } from '@angular/router';
@@ -408,7 +408,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
                     <!-- File upload button -->
                     <label class="inline-flex items-center gap-2 px-3 py-1.5 rounded-xl border border-slate-200 bg-white hover:bg-slate-50 cursor-pointer text-xs font-semibold text-slate-700 shadow-2xs transition">
                       <app-icon name="upload" [size]="14"></app-icon>
-                      <span>{{ isUploading() ? 'Uploading to Supabase...' : 'Upload Cover Image' }}</span>
+                      <span>{{ isUploading() ? 'Uploading...' : 'Upload & Crop Cover Image' }}</span>
                       <input
                         type="file"
                         accept="image/*"
@@ -542,6 +542,58 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
                 class="flex-1 h-9 rounded-xl bg-red-600 hover:bg-red-700 text-white text-xs font-semibold transition">
                 Confirm Delete
               </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <!-- Image Crop Modal -->
+      @if (showCropModal()) {
+        <div class="fixed inset-0 bg-slate-900/70 backdrop-blur-sm z-[60] flex items-center justify-center p-4">
+          <div class="bg-white rounded-2xl border border-slate-200 shadow-2xl max-w-lg w-full overflow-hidden animate-slide-in">
+            <div class="px-5 py-4 border-b border-slate-100 flex items-center justify-between">
+              <div>
+                <h3 class="text-sm font-bold text-slate-900">Crop Cover Image</h3>
+                <p class="text-[11px] text-slate-500">Drag to reposition · Scroll to zoom</p>
+              </div>
+              <button type="button" (click)="cancelCrop()" class="p-1 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 transition">
+                <app-icon name="x" [size]="16"></app-icon>
+              </button>
+            </div>
+
+            <div class="relative bg-slate-900 flex items-center justify-center overflow-hidden select-none" style="height:320px"
+              (mousedown)="cropDragStart($event)"
+              (mousemove)="cropDragMove($event)"
+              (mouseup)="cropDragEnd()"
+              (mouseleave)="cropDragEnd()"
+              (wheel)="cropWheel($event)">
+              <canvas id="bookCropCanvas"
+                [style.left.px]="cropOffsetX"
+                [style.top.px]="cropOffsetY"
+                [style.width.px]="cropCanvasDisplayW * cropScale"
+                [style.height.px]="cropCanvasDisplayH * cropScale"
+                [style.cursor]="cropDragging ? 'grabbing' : 'grab'"
+                style="position:absolute; transform-origin: top left;">
+              </canvas>
+              <div class="absolute inset-0 pointer-events-none flex items-center justify-center">
+                <div class="border-2 border-white/90 rounded-md" style="width:160px;height:220px;box-shadow:0 0 0 9999px rgba(0,0,0,0.55)"></div>
+              </div>
+            </div>
+
+            <div class="px-5 py-3 bg-slate-50 border-t border-slate-100 flex items-center justify-between gap-3">
+              <div class="flex items-center gap-2 text-slate-500">
+                <button type="button" (click)="cropZoom(-0.1)" class="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 font-bold text-base leading-none flex items-center justify-center">−</button>
+                <span class="text-xs font-mono">{{ (cropScale * 100).toFixed(0) }}%</span>
+                <button type="button" (click)="cropZoom(0.1)" class="w-7 h-7 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 font-bold text-base leading-none flex items-center justify-center">+</button>
+                <button type="button" (click)="cropReset()" class="h-7 px-2.5 rounded-lg border border-slate-200 bg-white hover:bg-slate-100 text-xs text-slate-600">Reset</button>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" (click)="cancelCrop()" class="h-8 px-4 rounded-xl border border-slate-200 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition">Cancel</button>
+                <button type="button" (click)="applyCrop()" class="h-8 px-4 rounded-xl bg-emerald-700 hover:bg-emerald-800 text-white text-xs font-semibold transition flex items-center gap-1.5">
+                  <app-icon name="check" [size]="13"></app-icon>
+                  Apply & Upload
+                </button>
+              </div>
             </div>
           </div>
         </div>
@@ -766,22 +818,6 @@ CREATE POLICY "Public full access batches" ON public.batches
     this.editingBookId = null;
   }
 
-  async onFileSelected(event: any) {
-    const file = event.target.files?.[0];
-    if (!file) return;
-
-    this.isUploading.set(true);
-    const { url, error } = await this.bookService.uploadCoverImage(file);
-    this.isUploading.set(false);
-
-    if (url) {
-      this.formData.cover_image_url = url;
-      this.toast.success('Cover uploaded to Supabase Storage!');
-    } else if (error) {
-      this.toast.warning(error);
-    }
-  }
-
   async saveBookWithStatus(isPublished: boolean) {
     this.formData.is_published = isPublished;
     await this.saveBook();
@@ -832,6 +868,146 @@ CREATE POLICY "Public full access batches" ON public.batches
 
     await this.bookService.deleteBook(book.id);
     this.bookToDelete.set(null);
+  }
+
+  // ─── Image Crop Logic ──────────────────────────────────────────────────────
+  showCropModal = signal(false);
+  cropScale = 1;
+  cropOffsetX = 0;
+  cropOffsetY = 0;
+  cropCanvasDisplayW = 0;
+  cropCanvasDisplayH = 0;
+  cropDragging = false;
+  private cropDragStartX = 0;
+  private cropDragStartY = 0;
+  private cropDragStartOffX = 0;
+  private cropDragStartOffY = 0;
+  private cropOriginalFile: File | null = null;
+  private cropImage: HTMLImageElement | null = null;
+  private readonly CROP_W = 160;
+  private readonly CROP_H = 220;
+  private readonly PREVIEW_AREA_W = 480;
+  private readonly PREVIEW_AREA_H = 320;
+
+  /** Called when user picks a file */
+  async onFileSelected(event: any) {
+    const file: File = event.target.files?.[0];
+    if (!file) return;
+    this.cropOriginalFile = file;
+    // Reset input so same file can be re-selected
+    (event.target as HTMLInputElement).value = '';
+
+    const img = new Image();
+    img.onload = () => {
+      this.cropImage = img;
+      this.cropScale = 1;
+      this.cropCanvasDisplayW = img.naturalWidth;
+      this.cropCanvasDisplayH = img.naturalHeight;
+      // Centre the image in preview area
+      this.cropOffsetX = (this.PREVIEW_AREA_W - this.cropCanvasDisplayW) / 2;
+      this.cropOffsetY = (this.PREVIEW_AREA_H - this.cropCanvasDisplayH) / 2;
+      this.showCropModal.set(true);
+      // Draw to canvas after modal renders
+      setTimeout(() => this.drawCropCanvas(), 50);
+    };
+    img.src = URL.createObjectURL(file);
+  }
+
+  private drawCropCanvas() {
+    const canvas = document.getElementById('bookCropCanvas') as HTMLCanvasElement | null;
+    if (!canvas || !this.cropImage) return;
+    canvas.width = this.cropImage.naturalWidth;
+    canvas.height = this.cropImage.naturalHeight;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    ctx.drawImage(this.cropImage, 0, 0);
+  }
+
+  cropDragStart(e: MouseEvent) {
+    this.cropDragging = true;
+    this.cropDragStartX = e.clientX;
+    this.cropDragStartY = e.clientY;
+    this.cropDragStartOffX = this.cropOffsetX;
+    this.cropDragStartOffY = this.cropOffsetY;
+  }
+
+  cropDragMove(e: MouseEvent) {
+    if (!this.cropDragging) return;
+    this.cropOffsetX = this.cropDragStartOffX + (e.clientX - this.cropDragStartX);
+    this.cropOffsetY = this.cropDragStartOffY + (e.clientY - this.cropDragStartY);
+  }
+
+  cropDragEnd() { this.cropDragging = false; }
+
+  cropWheel(e: WheelEvent) {
+    e.preventDefault();
+    this.cropZoom(e.deltaY < 0 ? 0.08 : -0.08);
+  }
+
+  cropZoom(delta: number) {
+    this.cropScale = Math.min(5, Math.max(0.2, this.cropScale + delta));
+  }
+
+  cropReset() {
+    this.cropScale = 1;
+    if (this.cropImage) {
+      this.cropOffsetX = (this.PREVIEW_AREA_W - this.cropImage.naturalWidth) / 2;
+      this.cropOffsetY = (this.PREVIEW_AREA_H - this.cropImage.naturalHeight) / 2;
+    }
+  }
+
+  cancelCrop() {
+    this.showCropModal.set(false);
+    this.cropImage = null;
+    this.cropOriginalFile = null;
+  }
+
+  async applyCrop() {
+    if (!this.cropImage) return;
+
+    // Work out which part of the image is behind the crop frame
+    const containerCentreX = this.PREVIEW_AREA_W / 2;
+    const containerCentreY = this.PREVIEW_AREA_H / 2;
+    const scaledW = this.cropCanvasDisplayW * this.cropScale;
+    const scaledH = this.cropCanvasDisplayH * this.cropScale;
+    const imageLeft = this.cropOffsetX;
+    const imageTop = this.cropOffsetY;
+
+    const frameCentreX = containerCentreX;
+    const frameCentreY = containerCentreY;
+
+    // Frame extents in screen space
+    const frameLeft = frameCentreX - this.CROP_W / 2;
+    const frameTop = frameCentreY - this.CROP_H / 2;
+
+    // Convert frame top-left to image pixel coords
+    const sx = ((frameLeft - imageLeft) / this.cropScale);
+    const sy = ((frameTop - imageTop) / this.cropScale);
+    const sw = this.CROP_W / this.cropScale;
+    const sh = this.CROP_H / this.cropScale;
+
+    // Draw cropped region onto output canvas
+    const out = document.createElement('canvas');
+    out.width = 600;
+    out.height = Math.round(600 * (this.CROP_H / this.CROP_W));
+    const ctx = out.getContext('2d')!;
+    ctx.drawImage(this.cropImage, sx, sy, sw, sh, 0, 0, out.width, out.height);
+
+    out.toBlob(async (blob) => {
+      if (!blob) { this.toast.error('Crop failed'); return; }
+      const croppedFile = new File([blob], this.cropOriginalFile?.name || 'cover.jpg', { type: 'image/jpeg' });
+      this.showCropModal.set(false);
+      this.isUploading.set(true);
+      const { url, error } = await this.bookService.uploadCoverImage(croppedFile);
+      this.isUploading.set(false);
+      if (url) {
+        this.formData.cover_image_url = url;
+        this.toast.success('Cover cropped & uploaded!');
+      } else if (error) {
+        this.toast.warning(error);
+      }
+    }, 'image/jpeg', 0.92);
   }
 }
 
