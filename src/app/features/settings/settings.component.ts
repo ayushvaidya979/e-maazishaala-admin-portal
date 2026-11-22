@@ -204,6 +204,8 @@ export class SettingsComponent implements OnInit {
         this.appName = appNameSetting.setting_value.value;
       }
 
+      this.appTagline = settings.find(s => s.setting_key === 'app_tagline')?.setting_value?.value || this.appTagline;
+      this.logoUrl = settings.find(s => s.setting_key === 'logo_url')?.setting_value?.value || '';
       const currencySetting = settings.find(s => s.setting_key === 'currency');
       if (currencySetting?.setting_value) {
         this.currencyCode = currencySetting.setting_value.value || 'INR';
@@ -215,11 +217,13 @@ export class SettingsComponent implements OnInit {
   async saveAllSettings() {
     this.isSaving.set(true);
 
-    await this.settingsService.updateSetting('app_name', { value: this.appName });
-    await this.settingsService.updateSetting('currency', { value: this.currencyCode, symbol: this.currencySymbol });
+    const results = [];
+    for (const [key, value] of Object.entries({ app_name: { value: this.appName }, app_tagline: { value: this.appTagline }, logo_url: { value: this.logoUrl }, currency: { value: this.currencyCode, symbol: this.currencySymbol } })) {
+      results.push(await this.settingsService.updateSetting(key, value));
+    }
 
     this.isSaving.set(false);
-    this.toast.success('All settings saved to Supabase');
+    if (results.every(Boolean)) this.toast.success('All settings saved to Supabase');
   }
 }
 

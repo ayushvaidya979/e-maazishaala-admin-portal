@@ -80,7 +80,7 @@ export class ContentService {
         const { error } = await this.supabase
           .from('app_content')
           .update(payload)
-          .eq('id', existing.id);
+          .eq('id', existing.id).select('id').single();
 
         if (error) throw error;
       } else {
@@ -88,7 +88,6 @@ export class ContentService {
           .from('app_content')
           .insert({
             ...payload,
-            id: 'cnt-' + Date.now().toString(36),
             created_at: new Date().toISOString()
           });
 
@@ -110,7 +109,6 @@ export class ContentService {
       const { error } = await this.supabase
         .from('app_content')
         .insert({
-          id: 'ann-' + Date.now().toString(36),
           content_key: key,
           title,
           body: message,
@@ -120,22 +118,6 @@ export class ContentService {
         });
 
       if (error) throw error;
-
-      // Broadcast to central public.notifications so all student apps receive real-time notifications
-      if (isPublished) {
-        try {
-          await this.supabase.from('notifications').insert({
-            title,
-            message,
-            type: 'general',
-            user_id: null, // Global broadcast to all students
-            action_url: '/home',
-            created_at: new Date().toISOString()
-          });
-        } catch (e) {
-          console.warn('Could not mirror announcement to public.notifications:', e);
-        }
-      }
 
       this.toast.success('Announcement broadcast published to student application!');
       await this.fetchAllContent();
@@ -151,7 +133,7 @@ export class ContentService {
       const { error } = await this.supabase
         .from('app_content')
         .delete()
-        .eq('id', id);
+        .eq('id', id).select('id').single();
 
       if (error) throw error;
 
@@ -169,7 +151,7 @@ export class ContentService {
       const { error } = await this.supabase
         .from('app_content')
         .update({ is_published: isPublished, updated_at: new Date().toISOString() })
-        .eq('id', id);
+        .eq('id', id).select('id').single();
 
       if (error) throw error;
 
@@ -190,7 +172,7 @@ export class ContentService {
           setting_value: visibility,
           updated_at: new Date().toISOString()
         })
-        .eq('setting_key', 'homepage_sections');
+        .eq('setting_key', 'homepage_sections').select('id').single();
 
       if (error) throw error;
 

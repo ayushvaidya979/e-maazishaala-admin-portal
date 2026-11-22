@@ -12,6 +12,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   template: `
+      @if (liveClassService.error(); as error) { <p role="alert" class="p-3 text-sm text-red-700 bg-red-50">Unable to refresh content: {{ error }}. Please check your connection.</p> }
     <div class="space-y-6">
       <!-- Top Action & Search Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
@@ -326,7 +327,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Scheduled Date *</label>
                   <input
-                    type="text"
+                    type="date"
                     [(ngModel)]="formData.scheduled_date"
                     name="scheduled_date"
                     required
@@ -336,7 +337,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
                 <div>
                   <label class="block text-xs font-semibold text-slate-700 mb-1">Timing *</label>
                   <input
-                    type="text"
+                    type="time"
                     [(ngModel)]="formData.scheduled_time"
                     name="scheduled_time"
                     required
@@ -494,8 +495,8 @@ export class LiveClassListComponent implements OnInit {
     teacher_title: 'Senior Mathematics Educator',
     teacher_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
     status: 'upcoming',
-    scheduled_date: 'Today, 06:00 PM',
-    scheduled_time: '06:00 PM - 07:15 PM',
+    scheduled_date: new Date().toLocaleDateString('en-CA'),
+    scheduled_time: '18:00',
     duration: '75 mins',
     meeting_link: 'https://meet.google.com',
     has_recording: false,
@@ -543,8 +544,8 @@ export class LiveClassListComponent implements OnInit {
       teacher_title: 'Senior Mathematics Educator',
       teacher_avatar: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=200&q=80',
       status: 'upcoming',
-      scheduled_date: 'Today, 06:00 PM',
-      scheduled_time: '06:00 PM - 07:15 PM',
+      scheduled_date: new Date().toLocaleDateString('en-CA'),
+      scheduled_time: '18:00',
       duration: '75 mins',
       meeting_link: 'https://meet.google.com',
       has_recording: false,

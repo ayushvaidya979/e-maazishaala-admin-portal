@@ -38,14 +38,14 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
           <!-- Admin Credentials Form -->
           <form (ngSubmit)="login()" class="space-y-4">
             <div>
-              <label class="block text-xs font-semibold text-slate-700 mb-1.5">Admin Username</label>
+              <label class="block text-xs font-semibold text-slate-700 mb-1.5">Admin Email</label>
               <input
                 type="text"
                 [(ngModel)]="username"
                 name="username"
                 required
                 autocomplete="username"
-                placeholder="adminemaazi shaala"
+                placeholder="Admin account email"
                 class="w-full h-10 px-3.5 rounded-xl border border-slate-200 text-xs text-slate-900 focus:outline-none focus:ring-2 focus:ring-emerald-700/20 focus:border-emerald-700 transition" />
             </div>
 
@@ -77,6 +77,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
             </button>
           </form>
 
+          <button type="button" (click)="googleLogin()" class="w-full h-10 border border-slate-300 rounded-xl text-sm font-semibold">Continue with Google</button>
           <!-- Security notice -->
           <div class="p-3.5 bg-slate-50 rounded-xl border border-slate-200/80 text-[11px] text-slate-500 space-y-1">
             <div class="flex items-center gap-1.5 font-semibold text-slate-700">
@@ -98,6 +99,10 @@ export class LoginComponent {
   router = inject(Router);
   route = inject(ActivatedRoute);
 
+  async googleLogin() {
+    const result = await this.auth.signInWithGoogle();
+    if (result.error) this.errorMessage.set(result.error);
+  }
   username = '';
   password = '';
   isSubmitting = signal(false);

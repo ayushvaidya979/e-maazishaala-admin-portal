@@ -12,6 +12,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   template: `
+      @if (batchService.error(); as error) { <p role="alert" class="p-3 text-sm text-red-700 bg-red-50">Unable to refresh content: {{ error }}. Please check your connection.</p> }
     <div class="space-y-6">
       <!-- Top Action & Search Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">

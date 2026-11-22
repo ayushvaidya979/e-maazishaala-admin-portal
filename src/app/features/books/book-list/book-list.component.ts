@@ -12,6 +12,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
   standalone: true,
   imports: [CommonModule, FormsModule, IconComponent],
   template: `
+      @if (bookService.error(); as error) { <p role="alert" class="p-3 text-sm text-red-700 bg-red-50">Unable to refresh content: {{ error }}. Please check your connection.</p> }
     <div class="space-y-6">
       <!-- Top Action & Search Header -->
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs">
@@ -21,13 +22,6 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
         </div>
 
         <div class="flex items-center gap-2 shrink-0">
-          <button
-            type="button"
-            (click)="showSqlModal.set(true)"
-            class="h-9 px-3.5 rounded-xl border border-emerald-200 bg-emerald-50 hover:bg-emerald-100 text-emerald-800 text-xs font-semibold transition flex items-center gap-1.5 shrink-0">
-            <app-icon name="database" [size]="14"></app-icon>
-            <span>Supabase Sync Guide</span>
-          </button>
 
           <button
             type="button"
@@ -38,26 +32,6 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
           </button>
         </div>
       </div>
-
-      <!-- Supabase Sync Notice if permission issue occurred -->
-      @if (bookService.hasSyncPermissionIssue()) {
-        <div class="p-4 bg-amber-50 border border-amber-200 rounded-2xl flex flex-col sm:flex-row sm:items-center justify-between gap-3 text-xs animate-slide-in">
-          <div class="flex items-start gap-2.5">
-            <div class="w-6 h-6 rounded-lg bg-amber-200 text-amber-900 flex items-center justify-center shrink-0 font-bold mt-0.5">!</div>
-            <div>
-              <span class="font-bold text-amber-900 block">Supabase Permission Notice</span>
-              <span class="text-amber-800 text-[11px]">Your books are safely preserved in this Admin Portal. To broadcast them live to Supabase and your Vercel deployed student portal, execute the 1-click SQL in your Supabase SQL Editor.</span>
-            </div>
-          </div>
-          <button
-            type="button"
-            (click)="showSqlModal.set(true)"
-            class="px-3.5 py-1.5 rounded-xl bg-amber-800 hover:bg-amber-900 text-white font-semibold text-[11px] shrink-0 transition flex items-center gap-1.5 self-start sm:self-center">
-            <app-icon name="file-text" [size]="13"></app-icon>
-            <span>View SQL Fix</span>
-          </button>
-        </div>
-      }
 
       <!-- Search, Filter & Summary Bar -->
       <div class="bg-white p-4 rounded-2xl border border-slate-200 shadow-2xs flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -599,64 +573,8 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
         </div>
       }
 
-      <!-- Supabase SQL Instructions Modal -->
-      @if (showSqlModal()) {
-        <div class="fixed inset-0 bg-slate-900/50 backdrop-blur-xs z-50 flex items-center justify-center p-4">
-          <div class="bg-white rounded-2xl border border-slate-200 shadow-xl max-w-xl w-full p-6 space-y-4 max-h-[90vh] overflow-y-auto">
-            <div class="flex items-center justify-between border-b border-slate-100 pb-3">
-              <div class="flex items-center gap-2">
-                <div class="w-8 h-8 rounded-xl bg-emerald-100 text-emerald-800 flex items-center justify-center">
-                  <app-icon name="database" [size]="16"></app-icon>
-                </div>
-                <div>
-                  <h3 class="text-sm font-bold text-slate-900">Supabase Live Sync Setup</h3>
-                  <p class="text-[11px] text-slate-500">Connect Admin Portal bidirectionally with student portal</p>
-                </div>
-              </div>
-              <button
-                type="button"
-                (click)="showSqlModal.set(false)"
-                class="w-7 h-7 rounded-lg text-slate-400 hover:text-slate-600 hover:bg-slate-100 flex items-center justify-center transition">
-                <app-icon name="x" [size]="14"></app-icon>
-              </button>
-            </div>
-
-            <div class="text-xs text-slate-600 space-y-2">
-              <p>To enable real-time synchronization so that any books or batches added here immediately appear on the deployed student portal on Vercel, run the following SQL script once in your <strong>Supabase Dashboard &rarr; SQL Editor</strong>:</p>
-            </div>
-
-            <div class="relative">
-              <pre class="bg-slate-900 text-slate-100 font-mono text-[11px] p-3.5 rounded-xl overflow-x-auto max-h-56 leading-relaxed selection:bg-emerald-700 selection:text-white">{{ syncSql }}</pre>
-              <button
-                type="button"
-                (click)="copySqlToClipboard()"
-                class="absolute top-2.5 right-2.5 px-2.5 py-1 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-[10px] font-semibold transition flex items-center gap-1 shadow-xs">
-                <app-icon name="copy" [size]="11"></app-icon>
-                <span>{{ hasCopiedSql() ? 'Copied!' : 'Copy SQL' }}</span>
-              </button>
-            </div>
-
-            <div class="p-3 bg-emerald-50 rounded-xl border border-emerald-100 text-[11px] text-emerald-800 space-y-1">
-              <span class="font-bold block">How to run in 30 seconds:</span>
-              <ol class="list-decimal list-inside space-y-0.5 text-emerald-900">
-                <li>Click <strong>Copy SQL</strong> above.</li>
-                <li>Open your Supabase project: <a href="https://supabase.com/dashboard/project/ozwyifbaqmfuytgwzmjy/sql" target="_blank" class="underline font-semibold text-emerald-950">Supabase SQL Editor</a>.</li>
-                <li>Paste the SQL and click <strong>Run</strong> (Ctrl+Enter / Cmd+Enter).</li>
-              </ol>
-            </div>
-
-            <div class="pt-2 flex justify-end">
-              <button
-                type="button"
-                (click)="showSqlModal.set(false)"
-                class="h-9 px-5 rounded-xl bg-slate-900 hover:bg-slate-800 text-white text-xs font-semibold transition">
-                Done
-              </button>
-            </div>
-          </div>
-        </div>
-      }
     </div>
+
   `
 })
 export class BookListComponent implements OnInit {
@@ -670,54 +588,12 @@ export class BookListComponent implements OnInit {
   pageSize = 10;
 
   showFormModal = signal(false);
-  showSqlModal = signal(false);
-  hasCopiedSql = signal(false);
   isUploading = signal(false);
   isSaving = signal(false);
   editingBookId: string | null = null;
   bookToDelete = signal<Book | null>(null);
 
-  readonly syncSql = `-- 1. Grant Schema & Table Privileges
-GRANT USAGE ON SCHEMA public TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.books TO anon, authenticated, service_role;
-GRANT ALL ON TABLE public.batches TO anon, authenticated, service_role;
-GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO anon, authenticated, service_role;
 
--- 2. Ensure ID column accepts both UUID and text
-DO $$ 
-BEGIN
-  ALTER TABLE public.books ALTER COLUMN id SET DATA TYPE text USING id::text;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
-DO $$ 
-BEGIN
-  ALTER TABLE public.batches ALTER COLUMN id SET DATA TYPE text USING id::text;
-EXCEPTION WHEN OTHERS THEN NULL;
-END $$;
-
--- 3. Open Access Policies
-ALTER TABLE public.books ENABLE ROW LEVEL SECURITY;
-ALTER TABLE public.batches ENABLE ROW LEVEL SECURITY;
-
-DROP POLICY IF EXISTS "Public full access books" ON public.books;
-CREATE POLICY "Public full access books" ON public.books 
-  FOR ALL TO authenticated, anon, service_role USING (true) WITH CHECK (true);
-
-DROP POLICY IF EXISTS "Public full access batches" ON public.batches;
-CREATE POLICY "Public full access batches" ON public.batches 
-  FOR ALL TO authenticated, anon, service_role USING (true) WITH CHECK (true);`;
-
-  copySqlToClipboard() {
-    try {
-      navigator.clipboard.writeText(this.syncSql);
-      this.hasCopiedSql.set(true);
-      this.toast.success('SQL script copied to clipboard!');
-      setTimeout(() => this.hasCopiedSql.set(false), 3000);
-    } catch {
-      this.toast.info('Please select and copy the SQL from the box.');
-    }
-  }
 
   formData: Partial<Book> = {
     title: '',

@@ -34,7 +34,7 @@ export class AuthService {
   readonly isAdmin = this.isAdminSignal.asReadonly();
   readonly isLoading = this.isLoadingSignal.asReadonly();
 
-  readonly isAuthenticated = computed(() => this.isAdminSignal() || !!this.sessionSignal());
+  readonly isAuthenticated = computed(() => this.isAdminSignal() && !!this.sessionSignal());
 
   constructor() {
     this.initAuth();
@@ -43,20 +43,7 @@ export class AuthService {
   private async initAuth() {
     this.isLoadingSignal.set(true);
 
-    // 1. Check local administrator session first
-    try {
-      const localSessionRaw = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (localSessionRaw) {
-        const localSession = JSON.parse(localSessionRaw);
-        if (localSession && localSession.role === 'admin') {
-          this.setAdminProfileState(localSession);
-          this.isLoadingSignal.set(false);
-          return;
-        }
-      }
-    } catch (e) {
-      // LocalStorage parse error, fallback
-    }
+    localStorage.removeItem(LOCAL_STORAGE_KEY);
 
     // 2. Check Supabase session
     try {
@@ -73,13 +60,15 @@ export class AuthService {
       this.isLoadingSignal.set(false);
     }
 
-    this.supabase.auth.onAuthStateChange(async (event, session) => {
+    this.supabase.auth.onAuthStateChange((event, session) => {
+      setTimeout(async () => {
       if (session) {
         await this.handleSessionUpdate(session);
-      } else if (!localStorage.getItem(LOCAL_STORAGE_KEY)) {
+      } else {
         this.clearState();
       }
       this.isLoadingSignal.set(false);
+      }, 0);
     });
   }
 
@@ -111,8 +100,6 @@ export class AuthService {
   }
 
   async checkAdminRole(userId: string): Promise<boolean> {
-    // If master admin local session is active
-    if (this.hasActiveAdminSession()) return true;
 
     try {
       const { data: rpcResult, error: rpcError } = await this.supabase.rpc('is_admin');
@@ -138,53 +125,12 @@ export class AuthService {
   }
 
   hasActiveAdminSession(): boolean {
-    if (this.isAdminSignal()) return true;
-    try {
-      const local = localStorage.getItem(LOCAL_STORAGE_KEY);
-      if (local) {
-        const parsed = JSON.parse(local);
-        return parsed && parsed.role === 'admin';
-      }
-    } catch {
-      return false;
-    }
-    return false;
+    return !!this.sessionSignal() && this.isAdminSignal();
   }
 
-  /**
-   * Primary Administrator Login:
-   * Username: adminemaazi shaala (or adminemaazishaala)
-   * Password: emaazishaala12345
-   */
   async signInWithCredentials(usernameInput: string, passwordInput: string): Promise<{ error?: string }> {
-    const username = (usernameInput || '').trim().toLowerCase();
-    const normalizedUsername = username.replace(/\s+/g, '');
-    const password = (passwordInput || '').trim();
-
-    // Check configured admin credentials
-    const isMasterAdmin =
-      (username === 'adminemaazi shaala' || normalizedUsername === 'adminemaazishaala') &&
-      password === 'emaazishaala12345';
-
-    if (isMasterAdmin) {
-      const profile: AdminProfile = {
-        id: 'admin-master',
-        email: 'admin@emaazishaala.com',
-        fullName: 'Admin e-MaziShaala',
-        avatarUrl: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?auto=format&fit=crop&w=120&q=80',
-        role: 'admin'
-      };
-
-      try {
-        localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(profile));
-      } catch (e) {
-        console.error('LocalStorage write error:', e);
-      }
-
-      this.setAdminProfileState(profile);
-      return {};
-    }
-
+    const username = usernameInput.trim().toLowerCase();
+    const password = passwordInput;
     // Secondary fallback: email sign-in with Supabase
     if (username.includes('@')) {
       try {
@@ -209,6 +155,14 @@ export class AuthService {
     }
 
     return { error: 'Invalid admin username or password. Please check your credentials.' };
+  }
+
+  async signInWithGoogle(): Promise<{ error?: string }> {
+    const { error } = await this.supabase.auth.signInWithOAuth({ provider: 'google', options: {
+      redirectTo: new URL('/auth/callback', window.location.origin).toString(),
+      queryParams: { prompt: 'select_account' }
+    } });
+    return error ? { error: error.message } : {};
   }
 
   async signOut() {

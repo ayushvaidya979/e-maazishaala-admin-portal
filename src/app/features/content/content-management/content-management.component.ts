@@ -411,13 +411,13 @@ export class ContentManagementComponent implements OnInit {
   async publishNewAnnouncement() {
     if (!this.newAnnouncement.title || !this.newAnnouncement.message) return;
 
-    await this.contentService.createAnnouncement(
+    const saved = await this.contentService.createAnnouncement(
       this.newAnnouncement.title,
       this.newAnnouncement.message,
       this.newAnnouncement.isPublished
     );
 
-    this.newAnnouncement = { title: '', message: '', isPublished: true };
+    if (saved) this.newAnnouncement = { title: '', message: '', isPublished: true };
     this.showAnnouncementModal.set(false);
   }
 

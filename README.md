@@ -95,3 +95,12 @@ ON CONFLICT (user_id) DO UPDATE SET role = 'admin';
 - **No Service Keys in Frontend**: Uses only `SUPABASE_URL` and `SUPABASE_ANON_KEY`.
 - **Database Row Level Security (RLS)**: Enforced on all tables. Anonymous or student users cannot insert, update, or delete content even with direct API requests.
 - **Zero Impact on User App**: The user app in `/Users/ayushvaidya/Downloads/e-mazishaala` remains completely intact and unaffected.
+
+
+## Shared content synchronization
+
+Use a real Supabase admin account (`ayushvaidya979@gmail.com`) with email/password or Google sign-in. The former demo username/password is no longer accepted. Configure this deployment's `/auth/callback` as an allowed Supabase Auth redirect for Google login.
+
+Books, batches, lectures, announcements, homepage controls, and public branding settings save to the same database as the student app. Failed writes show an error and do not create local-only records. Publish an item to show it to students; unpublish or delete it to remove it. Existing browser-only drafts are not automatically uploaded. Book covers use `book-covers`; batch covers use the existing `app-media` bucket.
+
+Run `npm run build` and `npm test -- --watch=false --include=src/app/core/services/catalog-sync.spec.ts`. Deploy this build alongside the updated student app. Shared database migrations and transactional integration tests are stored in the student repository's `supabase/migrations` and `scripts` directories.

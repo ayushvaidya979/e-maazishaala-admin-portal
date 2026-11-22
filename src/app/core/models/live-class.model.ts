@@ -2,6 +2,8 @@ export type LiveClassStatus = 'live' | 'upcoming' | 'completed';
 
 export interface LiveClass {
   id: string;
+  batch_id?: string;
+  is_public?: boolean;
   title: string;
   subject: string;
   standard: number;

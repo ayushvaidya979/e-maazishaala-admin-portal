@@ -1,4 +1,5 @@
-import { Component, OnInit, inject, signal } from '@angular/core';
+import { ContentSyncService } from '../../core/services/content-sync.service';
+import { DestroyRef, Component, OnInit, inject, signal } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { RouterModule } from '@angular/router';
 import { SupabaseService } from '../../core/services/supabase.service';
@@ -301,9 +302,11 @@ export class DashboardComponent implements OnInit {
   recentBooks = signal<Book[]>([]);
   recentBatches = signal<Batch[]>([]);
 
-  ngOnInit() {
-    this.loadStats();
+  constructor() {
+    inject(ContentSyncService).watch(['books', 'batches', 'app_content'], () => this.loadStats(), inject(DestroyRef));
   }
+
+  ngOnInit() {}
 
   async loadStats() {
     this.isLoading.set(true);
@@ -330,7 +333,7 @@ export class DashboardComponent implements OnInit {
         .select('*')
         .order('created_at', { ascending: false });
 
-      const allBatches: Batch[] = (batchesData as any[]) || [];
+      const allBatches: Batch[] = ((batchesData as any[]) || []).map(b => ({ ...b, status: ({ upcoming: 'Upcoming', registration_open: 'Registration Open', ongoing: 'Ongoing', full: 'Full', completed: 'Completed', cancelled: 'Cancelled' } as Record<string, string>)[b.status] || b.status }));
       const upcoming = allBatches.filter(b => b.status === 'Upcoming').length;
       const active = allBatches.filter(b => b.status === 'Registration Open' || b.status === 'Ongoing').length;
       this.recentBatches.set(allBatches.slice(0, 5));

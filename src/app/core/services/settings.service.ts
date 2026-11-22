@@ -43,11 +43,12 @@ export class SettingsService {
     try {
       const { error } = await this.supabase
         .from('app_settings')
-        .update({
+        .upsert({
+          setting_key: key,
+          is_public: true,
           setting_value: value,
           updated_at: new Date().toISOString()
-        })
-        .eq('setting_key', key);
+        }, { onConflict: 'setting_key' }).select('id').single();
 
       if (error) throw error;
 
